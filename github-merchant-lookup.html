@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Merchant Data Lookup - GitHub Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1em;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .setup-info {
+            background: #E8F5E8;
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .setup-info h3 {
+            color: #2E7D32;
+            margin-bottom: 15px;
+        }
+
+        .setup-info .highlight {
+            background: #FFF3CD;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 4px solid #FFC107;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input[type="url"], textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input[type="url"]:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+            font-family: monospace;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 200px;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #2196F3;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #1976D2;
+            transform: translateY(-2px);
+        }
+
+        .btn-success {
+            background: #FF9800;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #F57C00;
+            transform: translateY(-2px);
+        }
+
+        .status {
+            margin: 20px 0;
+            padding: 15px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .status.loading {
+            background: #E3F2FD;
+            color: #1976D2;
+            border-left: 4px solid #2196F3;
+        }
+
+        .status.success {
+            background: #E8F5E8;
+            color: #2E7D32;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status.error {
+            background: #FFEBEE;
+            color: #C62828;
+            border-left: 4px solid #F44336;
+        }
+
+        .results-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 2px solid #f0f0f0;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            text-align: center;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .stat-number {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+
+        .stat-label {
+            color: #666;
+            margin-top: 8px;
+            font-size: 1.1em;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+
+        .preview-table th,
+        .preview-table td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .preview-table th {
+            background: #4CAF50;
+            color: white;
+            font-weight: 600;
+        }
+
+        .preview-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+
+        .preview-table tr:hover {
+            background-color: #f0f8f0;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+            
+            button {
+                min-width: auto;
+            }
+            
+            .stats {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏪 Merchant Data Lookup</h1>
+            <p>GitHub-Powered Merchant Data Filtering & Export</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="setup-info">
+                <h3>🚀 GitHub Setup (Recommended)</h3>
+                <p><strong>Why GitHub?</strong> No CORS issues, reliable access, version control, free hosting!</p>
+                
+                <div class="highlight">
+                    <strong>📋 Quick Setup Steps:</strong><br>
+                    1. Create a GitHub repository<br>
+                    2. Upload your CSV file (e.g., <code>merchant-data.csv</code>)<br>
+                    3. Get the "Raw" file URL from GitHub<br>
+                    4. Paste it below - format: <code>https://raw.githubusercontent.com/username/repo/main/file.csv</code>
+                </div>
+                
+                <p><strong>✅ Sample data is pre-loaded for testing!</strong></p>
+            </div>
+
+            <div class="input-group">
+                <label for="csvUrl">📊 CSV Data URL (GitHub Raw URL or any direct CSV link):</label>
+                <input type="url" id="csvUrl" placeholder="https://raw.githubusercontent.com/username/repo/main/merchant-data.csv">
+                <small style="color: #666; margin-top: 5px; display: block;">💡 For GitHub: Go to your CSV file → Click "Raw" → Copy URL</small>
+            </div>
+            
+            <div class="input-group">
+                <label for="merchantIds">🔍 Merchant IDs to Filter (line-separated or comma-separated):</label>
+                <textarea id="merchantIds" placeholder="MERCHANT001
+MERCHANT002, MERCHANT003
+MERCHANT004"></textarea>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn-primary" onclick="loadAndPreview()">🔄 Load Data</button>
+                <button class="btn-secondary" onclick="filterData()">🎯 Filter by IDs</button>
+                <button class="btn-success" onclick="downloadFilteredData()">⬇️ Download Results</button>
+            </div>
+
+            <div id="status"></div>
+
+            <div id="results" class="results-section" style="display: none;">
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRows">0</div>
+                        <div class="stat-label">Total Records</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="filteredRows">0</div>
+                        <div class="stat-label">Filtered Results</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="matchRate">0%</div>
+                        <div class="stat-label">Match Rate</div>
+                    </div>
+                </div>
+                
+                <div id="previewContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let fullData = [];
+        let filteredData = [];
+        let headers = [];
+
+        function showStatus(message, type = 'loading') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.innerHTML = message;
+            statusDiv.className = `status ${type}`;
+        }
+
+        function parseMerchantIds(input) {
+            return input
+                .split(/[\n,]+/)
+                .map(id => id.trim())
+                .filter(id => id.length > 0);
+        }
+
+        function parseCSV(csvText) {
+            const lines = csvText.split('\n').filter(line => line.trim());
+            if (lines.length === 0) return { headers: [], data: [] };
+            
+            const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+            const data = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''));
+                if (values.length === headers.length) {
+                    const row = {};
+                    headers.forEach((header, index) => {
+                        row[header] = values[index];
+                    });
+                    data.push(row);
+                }
+            }
+            
+            return { headers, data };
+        }
+
+        async function loadAndPreview() {
+            const csvUrl = document.getElementById('csvUrl').value.trim();
+            
+            if (!csvUrl) {
+                showStatus('⚠️ Please enter a CSV URL', 'error');
+                return;
+            }
+
+            showStatus('📡 Loading data from CSV...', 'loading');
+            
+            try {
+                const response = await fetch(csvUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}. Make sure the URL is a direct link to raw CSV data.`);
+                }
+                
+                const csvText = await response.text();
+                
+                if (!csvText || csvText.trim().length === 0) {
+                    throw new Error('Empty response. Please check if the URL points to a CSV file.');
+                }
+                
+                const parsed = parseCSV(csvText);
+                
+                if (parsed.data.length === 0) {
+                    throw new Error('No data found in CSV. Please check the file format.');
+                }
+                
+                fullData = parsed.data;
+                headers = parsed.headers;
+                filteredData = [...fullData];
+                
+                updateStats();
+                displayPreview(filteredData.slice(0, 15)); // Show first 15 rows
+                
+                showStatus(`✅ Successfully loaded ${fullData.length} records with columns: ${headers.join(', ')}`, 'success');
+                document.getElementById('results').style.display = 'block';
+                
+            } catch (error) {
+                showStatus(`❌ Error loading CSV: ${error.message}`, 'error');
+                console.error('CSV Load Error:', error);
+            }
+        }
+
+        function filterData() {
+            const merchantInput = document.getElementById('merchantIds').value.trim();
+            
+            if (!merchantInput) {
+                showStatus('⚠️ Please enter merchant IDs to filter', 'error');
+                return;
+            }
+            
+            if (fullData.length === 0) {
+                showStatus('⚠️ Please load CSV data first', 'error');
+                return;
+            }
+
+            const merchantIds = parseMerchantIds(merchantInput);
+            showStatus(`🔍 Filtering data for ${merchantIds.length} merchant IDs...`, 'loading');
+            
+            // Find merchant ID column (flexible matching)
+            const merchantColumn = headers.find(header => 
+                header.toLowerCase().includes('merchant') && header.toLowerCase().includes('id')
+            ) || headers.find(header => 
+                header.toLowerCase().includes('merchant')
+            ) || headers.find(header => 
+                header.toLowerCase().includes('id')
+            ) || headers[0]; // fallback to first column
+            
+            filteredData = fullData.filter(row => {
+                const merchantId = row[merchantColumn];
+                return merchantIds.some(id => 
+                    merchantId && merchantId.toString().toLowerCase().includes(id.toLowerCase())
+                );
+            });
+            
+            updateStats();
+            displayPreview(filteredData);
+            
+            const matchRate = fullData.length > 0 ? ((filteredData.length / fullData.length) * 100).toFixed(1) : 0;
+            showStatus(`✅ Found ${filteredData.length} matches (${matchRate}% match rate). Searched in column: "${merchantColumn}"`, 'success');
+        }
+
+        function updateStats() {
+            document.getElementById('totalRows').textContent = fullData.length;
+            document.getElementById('filteredRows').textContent = filteredData.length;
+            
+            const matchRate = fullData.length > 0 ? ((filteredData.length / fullData.length) * 100).toFixed(1) : 0;
+            document.getElementById('matchRate').textContent = `${matchRate}%`;
+        }
+
+        function displayPreview(data) {
+            const container = document.getElementById('previewContainer');
+            
+            if (data.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #666; padding: 40px; background: #f9f9f9; border-radius: 8px;"><h3>No data to display</h3><p>Try adjusting your search criteria</p></div>';
+                return;
+            }
+            
+            let tableHTML = '<table class="preview-table"><thead><tr>';
+            headers.forEach(header => {
+                tableHTML += `<th>${header}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+            
+            data.forEach(row => {
+                tableHTML += '<tr>';
+                headers.forEach(header => {
+                    tableHTML += `<td>${row[header] || ''}</td>`;
+                });
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody></table>';
+            
+            container.innerHTML = tableHTML;
+        }
+
+        function downloadFilteredData() {
+            if (filteredData.length === 0) {
+                showStatus('⚠️ No filtered data to download', 'error');
+                return;
+            }
+            
+            // Create CSV content
+            let csvContent = headers.join(',') + '\n';
+            filteredData.forEach(row => {
+                const values = headers.map(header => {
+                    const value = row[header] || '';
+                    // Escape quotes and wrap in quotes if contains comma or newline
+                    return value.includes(',') || value.includes('\n') || value.includes('"') ? 
+                        `"${value.replace(/"/g, '""')}"` : value;
+                });
+                csvContent += values.join(',') + '\n';
+            });
+            
+            // Create and download file
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `filtered_merchant_data_${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus(`✅ Downloaded ${filteredData.length} records successfully!`, 'success');
+            } else {
+                showStatus('❌ Download not supported in this browser', 'error');
+            }
+        }
+
+        // Load sample GitHub data on page load for demonstration
+        window.addEventListener('load', function() {
+            // Your actual GitHub raw CSV URL
+            document.getElementById('csvUrl').value = 'https://raw.githubusercontent.com/Aaqib321/merchant_data/main/Final_AM_tool_query.xls.csv';
+            document.getElementById('merchantIds').value = 'MERCHANT001\nMERCHANT002\nMERCHANT003';
+        });
+    </script>
+</body>
+</html>
