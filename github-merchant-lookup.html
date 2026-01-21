@@ -362,11 +362,11 @@
                     </div>
                     
                     <div class="filter-group">
-                        <label>📊 FBA Commitment %:</label>
+                        <label>📊 FBA Commitment % (enter as percentage, e.g., 50 for 50%):</label>
                         <div class="range-inputs">
-                            <input type="number" id="fbaMin" placeholder="Min %" min="0" max="100" value="0">
+                            <input type="number" id="fbaMin" placeholder="Min %" min="0" max="100" value="0" step="0.1">
                             <span>to</span>
-                            <input type="number" id="fbaMax" placeholder="Max %" min="0" max="100" value="100">
+                            <input type="number" id="fbaMax" placeholder="Max %" min="0" max="100" value="100" step="0.1">
                         </div>
                     </div>
                     
@@ -614,9 +614,11 @@ MERCHANT002, MERCHANT003
                         return false;
                     }
                     
-                    // FBA percentage filter
+                    // FBA percentage filter (convert user input from percentage to decimal)
                     const fbaPercent = parseFloat(row.pct_units_fba) || 0;
-                    if (fbaPercent < fbaMin || fbaPercent > fbaMax) {
+                    const fbaMinDecimal = fbaMin / 100; // Convert percentage to decimal
+                    const fbaMaxDecimal = fbaMax / 100; // Convert percentage to decimal
+                    if (fbaPercent < fbaMinDecimal || fbaPercent > fbaMaxDecimal) {
                         return false;
                     }
                     
@@ -689,7 +691,7 @@ MERCHANT002, MERCHANT003
                         <td>${row.top_pf || ''}</td>
                         <td>${parseFloat(row.pf_mfn_gms || 0).toLocaleString()}</td>
                         <td>${parseFloat(row.merchant_total_gms || 0).toLocaleString()}</td>
-                        <td>${parseFloat(row.pct_units_fba || 0).toFixed(1)}%</td>
+                        <td>${(parseFloat(row.pct_units_fba || 0) * 100).toFixed(1)}%</td>
                     </tr>`;
             });
             
