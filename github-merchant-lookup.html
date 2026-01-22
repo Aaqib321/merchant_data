@@ -377,6 +377,8 @@
                             <option value="10">Top 10</option>
                             <option value="15" selected>Top 15</option>
                             <option value="20">Top 20</option>
+                            <option value="50">Top 50</option>
+                            <option value="100">Top 100</option>
                             <option value="all">All Matching</option>
                         </select>
                     </div>
@@ -395,6 +397,7 @@
                 <div class="button-group">
                     <button class="btn-secondary" onclick="loadCriteriaData()">📊 Load Criteria Data</button>
                     <button class="btn-secondary" onclick="applySmartFilter()">🎯 Apply Smart Filter</button>
+                    <button class="btn-primary" onclick="downloadCriteriaResults()">📥 Download Filtered Results</button>
                     <button class="btn-success" onclick="clearFilters()">🧹 Clear Filters</button>
                 </div>
                 
@@ -485,6 +488,7 @@ MERCHANT002, MERCHANT003
         let headers = [];
         let criteriaData = [];
         let criteriaHeaders = [];
+        let filteredCriteriaResults = []; // Store current smart filter results
 
         function showStatus(message, type = 'loading') {
             const statusDiv = document.getElementById('status');
@@ -614,10 +618,27 @@ MERCHANT002, MERCHANT003
                         return false;
                     }
                     
-                    // FBA percentage filter (convert user input from percentage to decimal)
-                    const fbaPercent = parseFloat(row.pct_units_fba) || 0;
+                    // FBA percentage filter with improved logic for missing/invalid data
+                    const fbaValue = row.pct_units_fba;
+                    let fbaPercent = parseFloat(fbaValue);
+                    
+                    // Handle missing or invalid FBA data
+                    if (isNaN(fbaPercent) || fbaValue === '' || fbaValue === null || fbaValue === undefined) {
+                        // Include records with missing FBA data if user selects full range (0-100%)
+                        if (fbaMin === 0 && fbaMax === 100) {
+                            return true; // Include missing data when full range is selected
+                        }
+                        return false;
+                    }
+                    
                     const fbaMinDecimal = fbaMin / 100; // Convert percentage to decimal
                     const fbaMaxDecimal = fbaMax / 100; // Convert percentage to decimal
+                    
+                    // Handle values > 1.0 (>100% FBA) - include them when max is 100%
+                    if (fbaPercent > 1.0 && fbaMax === 100) {
+                        return true;
+                    }
+                    
                     if (fbaPercent < fbaMinDecimal || fbaPercent > fbaMaxDecimal) {
                         return false;
                     }
@@ -637,6 +658,9 @@ MERCHANT002, MERCHANT003
                     filtered = filtered.slice(0, parseInt(topCount));
                 }
                 
+                // Store filtered results for download functionality
+                filteredCriteriaResults = filtered;
+                
                 // Extract merchant IDs and populate the textarea
                 const merchantIds = filtered.map(row => row.merchant_customer_id).filter(id => id);
                 document.getElementById('merchantIds').value = merchantIds.join('\n');
@@ -647,7 +671,20 @@ MERCHANT002, MERCHANT003
                 // Show filter results
                 displayFilterResults(filtered, productFamily, fbaMin, fbaMax, topCount, sortBy);
                 
-                showStatus(`✅ Found ${filtered.length} merchants matching criteria. Merchant IDs auto-populated!`, 'success');
+                // Debug information
+                if (productFamily) {
+                    const totalForPF = criteriaData.filter(row => row.top_pf === productFamily).length;
+                    console.log(`Debug: Total ${productFamily} merchants in data: ${totalForPF}`);
+                    console.log(`Debug: After filtering: ${filtered.length}`);
+                    console.log(`Debug: Filter criteria - FBA: ${fbaMin}%-${fbaMax}%`);
+                }
+                
+                // Show detailed status including potential data issues
+                let statusMsg = `✅ Found ${filtered.length} merchants matching criteria. Merchant IDs auto-populated!`;
+                if (productFamily && filtered.length < criteriaData.filter(row => row.top_pf === productFamily).length) {
+                    statusMsg += ` (Note: Some merchants may have missing FBA data - check browser console for details)`;
+                }
+                showStatus(statusMsg, 'success');
                 
             } catch (error) {
                 showStatus(`❌ Error applying filters: ${error.message}`, 'error');
@@ -704,6 +741,66 @@ MERCHANT002, MERCHANT003
             resultsDiv.innerHTML = tableHTML;
         }
 
+        function downloadCriteriaResults() {
+            if (filteredCriteriaResults.length === 0) {
+                showStatus('⚠️ No filtered criteria results to download. Please apply smart filter first.', 'error');
+                return;
+            }
+            
+            // Define the columns we want to include in the CSV
+            const csvHeaders = ['merchant_customer_id', 'merchant_name', 'top_pf', 'pf_mfn_gms', 'merchant_total_gms', 'pf_total_gms', 'pct_units_fba'];
+            const csvHeaderLabels = ['Merchant ID', 'Merchant Name', 'Product Family', 'MFN GMS', 'Total GMS', 'PF Total GMS', 'FBA %'];
+            
+            // Create CSV content
+            let csvContent = csvHeaderLabels.join(',') + '\n';
+            
+            filteredCriteriaResults.forEach(row => {
+                const values = csvHeaders.map(header => {
+                    let value = row[header] || '';
+                    
+                    // Convert FBA percentage from decimal to percentage for display
+                    if (header === 'pct_units_fba' && value !== '') {
+                        value = (parseFloat(value) * 100).toFixed(2);
+                    }
+                    
+                    // Format numbers for better readability
+                    if (['pf_mfn_gms', 'merchant_total_gms', 'pf_total_gms'].includes(header) && value !== '') {
+                        value = parseFloat(value).toLocaleString();
+                    }
+                    
+                    // Escape quotes and wrap in quotes if contains comma or newline
+                    return value.toString().includes(',') || value.toString().includes('\n') || value.toString().includes('"') ? 
+                        `"${value.toString().replace(/"/g, '""')}"` : value;
+                });
+                csvContent += values.join(',') + '\n';
+            });
+            
+            // Add UTF-8 BOM for proper Japanese character encoding
+            const BOM = '\uFEFF';
+            const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            
+            if (link.download !== undefined) {
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                
+                // Generate filename with current date and filter criteria
+                const productFamily = document.getElementById('productFamily').value || 'All';
+                const topCount = document.getElementById('topCount').value;
+                const today = new Date().toISOString().split('T')[0];
+                
+                link.setAttribute('download', `smart_filter_${productFamily}_top${topCount}_${today}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showStatus(`✅ Downloaded ${filteredCriteriaResults.length.toLocaleString()} filtered merchant records successfully!`, 'success');
+            } else {
+                showStatus('❌ Download not supported in this browser', 'error');
+            }
+        }
+
         function clearFilters() {
             document.getElementById('productFamily').value = '';
             document.getElementById('fbaMin').value = '0';
@@ -713,6 +810,7 @@ MERCHANT002, MERCHANT003
             document.getElementById('merchantIds').value = '';
             document.getElementById('filterResults').innerHTML = '';
             document.getElementById('criteriaMatches').textContent = '0';
+            filteredCriteriaResults = []; // Clear filtered results
             
             showStatus('🧹 Filters cleared', 'success');
         }
