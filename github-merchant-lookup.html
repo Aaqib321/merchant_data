@@ -349,8 +349,8 @@
                 
                 <div class="filter-grid">
                     <div class="filter-group">
-                        <label for="productFamily">📦 Product Family:</label>
-                        <select id="productFamily">
+                        <label for="primaryPF">📦 Primary Product Family:</label>
+                        <select id="primaryPF">
                             <option value="">All Product Families</option>
                             <option value="Consumables">Consumables</option>
                             <option value="Digital">Digital</option>
@@ -358,6 +358,13 @@
                             <option value="Media">Media</option>
                             <option value="Softlines">Softlines</option>
                             <option value="Total CE">Total CE</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="primaryGL">🏢 Primary GL:</label>
+                        <select id="primaryGL">
+                            <option value="">All GLs</option>
                         </select>
                     </div>
                     
@@ -386,9 +393,8 @@
                     <div class="filter-group">
                         <label for="sortBy">📈 Sort By:</label>
                         <select id="sortBy">
-                            <option value="pf_mfn_gms" selected>MFN GMS</option>
+                            <option value="mfn_gms" selected>MFN GMS</option>
                             <option value="merchant_total_gms">Total GMS</option>
-                            <option value="pf_total_gms">PF Total GMS</option>
                             <option value="pct_units_fba">FBA %</option>
                         </select>
                     </div>
@@ -581,8 +587,8 @@ MERCHANT002, MERCHANT003
                 criteriaData = parsed.data;
                 criteriaHeaders = parsed.headers;
                 
-                // Product family dropdown is pre-populated in HTML
-                // No need to populate dynamically
+                // Populate dropdown options from loaded data
+                populateDropdowns();
                 
                 showStatus(`✅ Loaded ${criteriaData.length.toLocaleString()} merchant criteria records`, 'success');
                 
@@ -592,9 +598,22 @@ MERCHANT002, MERCHANT003
             }
         }
 
-        function populateProductFamilies() {
-            // Product families are now hardcoded in HTML
-            // No need to populate dynamically
+        function populateDropdowns() {
+            // Product families are hardcoded in HTML
+            // Populate Primary GL dropdown dynamically
+            const primaryGLSelect = document.getElementById('primaryGL');
+            const uniqueGLs = [...new Set(criteriaData.map(row => row.primary_gl).filter(gl => gl && gl.trim()))];
+            
+            // Clear existing options (except "All")
+            primaryGLSelect.innerHTML = '<option value="">All GLs</option>';
+            
+            // Add unique GLs
+            uniqueGLs.sort().forEach(gl => {
+                const option = document.createElement('option');
+                option.value = gl;
+                option.textContent = gl;
+                primaryGLSelect.appendChild(option);
+            });
         }
 
         function applySmartFilter() {
@@ -603,7 +622,8 @@ MERCHANT002, MERCHANT003
                 return;
             }
             
-            const productFamily = document.getElementById('productFamily').value;
+            const primaryPF = document.getElementById('primaryPF').value;
+            const primaryGL = document.getElementById('primaryGL').value;
             const fbaMin = parseFloat(document.getElementById('fbaMin').value) || 0;
             const fbaMax = parseFloat(document.getElementById('fbaMax').value) || 100;
             const topCount = document.getElementById('topCount').value;
@@ -613,22 +633,32 @@ MERCHANT002, MERCHANT003
             
             try {
                 let filtered = criteriaData.filter(row => {
-                    // Product family filter
-                    if (productFamily && row.top_pf !== productFamily) {
+                    // Primary Product Family filter
+                    if (primaryPF && row.primary_pf !== primaryPF) {
                         return false;
                     }
                     
-                    // FBA percentage filter with improved logic for missing/invalid data
+                    // Primary GL filter
+                    if (primaryGL && row.primary_gl !== primaryGL) {
+                        return false;
+                    }
+                    
+                    // FBA percentage filter - keep 0 values as 0, handle missing data
                     const fbaValue = row.pct_units_fba;
                     let fbaPercent = parseFloat(fbaValue);
                     
-                    // Handle missing or invalid FBA data
+                    // Handle missing or invalid FBA data (but keep 0 as 0)
                     if (isNaN(fbaPercent) || fbaValue === '' || fbaValue === null || fbaValue === undefined) {
                         // Include records with missing FBA data if user selects full range (0-100%)
                         if (fbaMin === 0 && fbaMax === 100) {
                             return true; // Include missing data when full range is selected
                         }
                         return false;
+                    }
+                    
+                    // If FBA is exactly 0, keep it as 0 (don't treat as missing)
+                    if (fbaPercent === 0) {
+                        fbaPercent = 0; // Explicitly keep 0 values
                     }
                     
                     const fbaMinDecimal = fbaMin / 100; // Convert percentage to decimal
@@ -669,7 +699,7 @@ MERCHANT002, MERCHANT003
                 document.getElementById('criteriaMatches').textContent = filtered.length.toLocaleString();
                 
                 // Show filter results
-                displayFilterResults(filtered, productFamily, fbaMin, fbaMax, topCount, sortBy);
+                displayFilterResults(filtered, primaryPF, primaryGL, fbaMin, fbaMax, topCount, sortBy);
                 
                 // Debug information
                 if (productFamily) {
@@ -681,7 +711,7 @@ MERCHANT002, MERCHANT003
                 
                 // Show detailed status including potential data issues
                 let statusMsg = `✅ Found ${filtered.length} merchants matching criteria. Merchant IDs auto-populated!`;
-                if (productFamily && filtered.length < criteriaData.filter(row => row.top_pf === productFamily).length) {
+                if (primaryPF && filtered.length < criteriaData.filter(row => row.primary_pf === primaryPF).length) {
                     statusMsg += ` (Note: Some merchants may have missing FBA data - check browser console for details)`;
                 }
                 showStatus(statusMsg, 'success');
@@ -692,14 +722,15 @@ MERCHANT002, MERCHANT003
             }
         }
 
-        function displayFilterResults(filtered, productFamily, fbaMin, fbaMax, topCount, sortBy) {
+        function displayFilterResults(filtered, primaryPF, primaryGL, fbaMin, fbaMax, topCount, sortBy) {
             const resultsDiv = document.getElementById('filterResults');
             
             const criteriaText = [
-                productFamily ? `Product Family: ${productFamily}` : 'All Product Families',
+                primaryPF ? `Primary PF: ${primaryPF}` : 'All Product Families',
+                primaryGL ? `Primary GL: ${primaryGL}` : 'All GLs',
                 `FBA %: ${fbaMin}% - ${fbaMax}%`,
                 topCount === 'all' ? 'All matches' : `Top ${topCount}`,
-                `Sorted by: ${sortBy === 'pf_mfn_gms' ? 'MFN GMS' : sortBy}`
+                `Sorted by: ${sortBy === 'mfn_gms' ? 'MFN GMS' : sortBy}`
             ].join(' | ');
             
             let tableHTML = `
@@ -712,7 +743,8 @@ MERCHANT002, MERCHANT003
                                 <tr>
                                     <th>Merchant ID</th>
                                     <th>Merchant Name</th>
-                                    <th>Product Family</th>
+                                    <th>Primary PF</th>
+                                    <th>Primary GL</th>
                                     <th>MFN GMS</th>
                                     <th>Total GMS</th>
                                     <th>FBA %</th>
@@ -725,8 +757,9 @@ MERCHANT002, MERCHANT003
                     <tr>
                         <td>${row.merchant_customer_id || ''}</td>
                         <td>${row.merchant_name || ''}</td>
-                        <td>${row.top_pf || ''}</td>
-                        <td>${parseFloat(row.pf_mfn_gms || 0).toLocaleString()}</td>
+                        <td>${row.primary_pf || ''}</td>
+                        <td>${row.primary_gl || ''}</td>
+                        <td>${parseFloat(row.mfn_gms || 0).toLocaleString()}</td>
                         <td>${parseFloat(row.merchant_total_gms || 0).toLocaleString()}</td>
                         <td>${(parseFloat(row.pct_units_fba || 0) * 100).toFixed(1)}%</td>
                     </tr>`;
@@ -748,8 +781,8 @@ MERCHANT002, MERCHANT003
             }
             
             // Define the columns we want to include in the CSV
-            const csvHeaders = ['merchant_customer_id', 'merchant_name', 'top_pf', 'pf_mfn_gms', 'merchant_total_gms', 'pf_total_gms', 'pct_units_fba'];
-            const csvHeaderLabels = ['Merchant ID', 'Merchant Name', 'Product Family', 'MFN GMS', 'Total GMS', 'PF Total GMS', 'FBA %'];
+            const csvHeaders = ['merchant_customer_id', 'merchant_name', 'primary_pf', 'primary_gl', 'mfn_gms', 'merchant_total_gms', 'pct_units_fba'];
+            const csvHeaderLabels = ['Merchant ID', 'Merchant Name', 'Primary PF', 'Primary GL', 'MFN GMS', 'Total GMS', 'FBA %'];
             
             // Create CSV content
             let csvContent = csvHeaderLabels.join(',') + '\n';
@@ -764,7 +797,7 @@ MERCHANT002, MERCHANT003
                     }
                     
                     // Format numbers for better readability
-                    if (['pf_mfn_gms', 'merchant_total_gms', 'pf_total_gms'].includes(header) && value !== '') {
+                    if (['mfn_gms', 'merchant_total_gms'].includes(header) && value !== '') {
                         value = parseFloat(value).toLocaleString();
                     }
                     
@@ -785,11 +818,12 @@ MERCHANT002, MERCHANT003
                 link.setAttribute('href', url);
                 
                 // Generate filename with current date and filter criteria
-                const productFamily = document.getElementById('productFamily').value || 'All';
+                const primaryPF = document.getElementById('primaryPF').value || 'All';
+                const primaryGL = document.getElementById('primaryGL').value || 'All';
                 const topCount = document.getElementById('topCount').value;
                 const today = new Date().toISOString().split('T')[0];
                 
-                link.setAttribute('download', `smart_filter_${productFamily}_top${topCount}_${today}.csv`);
+                link.setAttribute('download', `smart_filter_${primaryPF}_${primaryGL}_top${topCount}_${today}.csv`);
                 link.style.visibility = 'hidden';
                 document.body.appendChild(link);
                 link.click();
@@ -802,11 +836,12 @@ MERCHANT002, MERCHANT003
         }
 
         function clearFilters() {
-            document.getElementById('productFamily').value = '';
+            document.getElementById('primaryPF').value = '';
+            document.getElementById('primaryGL').value = '';
             document.getElementById('fbaMin').value = '0';
             document.getElementById('fbaMax').value = '100';
             document.getElementById('topCount').value = '15';
-            document.getElementById('sortBy').value = 'pf_mfn_gms';
+            document.getElementById('sortBy').value = 'mfn_gms';
             document.getElementById('merchantIds').value = '';
             document.getElementById('filterResults').innerHTML = '';
             document.getElementById('criteriaMatches').textContent = '0';
