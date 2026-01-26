@@ -394,7 +394,6 @@
                         <label for="sortBy">📈 Sort By:</label>
                         <select id="sortBy">
                             <option value="mfn_gms" selected>MFN GMS</option>
-                            <option value="merchant_total_gms">Total GMS</option>
                             <option value="pct_units_fba">FBA %</option>
                         </select>
                     </div>
@@ -509,6 +508,69 @@ MERCHANT002, MERCHANT003
                 .filter(id => id.length > 0);
         }
 
+        function analyzeDataQuality() {
+            if (criteriaData.length === 0) return;
+            
+            let zeroValues = 0;
+            let decimalValues = 0; // 0-1
+            let percentageValues = 0; // 1-100  
+            let highValues = 0; // >100
+            let invalidValues = 0;
+            
+            criteriaData.forEach(row => {
+                const fbaValue = parseFloat(row.pct_units_fba);
+                
+                if (isNaN(fbaValue) || row.pct_units_fba === '' || row.pct_units_fba === null) {
+                    invalidValues++;
+                } else if (fbaValue === 0) {
+                    zeroValues++;
+                } else if (fbaValue > 0 && fbaValue <= 1) {
+                    decimalValues++;
+                } else if (fbaValue > 1 && fbaValue <= 100) {
+                    percentageValues++;
+                } else if (fbaValue > 100) {
+                    highValues++;
+                }
+            });
+            
+            console.log('📊 FBA Data Quality Analysis:');
+            console.log(`   Zero values (0%): ${zeroValues.toLocaleString()}`);
+            console.log(`   Decimal format (0-1): ${decimalValues.toLocaleString()}`);
+            console.log(`   Percentage format (1-100%): ${percentageValues.toLocaleString()}`);
+            console.log(`   🚨 High values (>100%): ${highValues.toLocaleString()}`);
+            console.log(`   ❌ Invalid/Missing: ${invalidValues.toLocaleString()}`);
+            
+            if (highValues > 0) {
+                console.warn(`⚠️ ${highValues} merchants have FBA% > 100% - this indicates data quality issues!`);
+            }
+        }
+
+        function formatFBAPercentage(value) {
+            if (!value || value === '' || value === null || value === undefined) {
+                return '0.0%';
+            }
+            
+            let fbaValue = parseFloat(value);
+            
+            if (isNaN(fbaValue)) {
+                return '0.0%';
+            }
+            
+            // If value is already > 100, it's likely already a percentage (data quality issue)
+            if (fbaValue > 100) {
+                console.warn(`FBA percentage > 100% detected: ${fbaValue}. This may be a data quality issue.`);
+                return `${fbaValue.toFixed(1)}% (Data Issue)`;
+            }
+            
+            // If value is between 1-100, it's likely already a percentage
+            if (fbaValue > 1 && fbaValue <= 100) {
+                return `${fbaValue.toFixed(1)}%`;
+            }
+            
+            // If value is 0-1, treat as decimal and convert to percentage
+            return `${(fbaValue * 100).toFixed(1)}%`;
+        }
+
         function parseCSV(csvText) {
             const lines = csvText.split('\n').filter(line => line.trim());
             if (lines.length === 0) return { headers: [], data: [] };
@@ -590,6 +652,9 @@ MERCHANT002, MERCHANT003
                 // Populate dropdown options from loaded data
                 populateDropdowns();
                 
+                // Analyze FBA data quality
+                analyzeDataQuality();
+                
                 showStatus(`✅ Loaded ${criteriaData.length.toLocaleString()} merchant criteria records`, 'success');
                 
             } catch (error) {
@@ -661,15 +726,22 @@ MERCHANT002, MERCHANT003
                         fbaPercent = 0; // Explicitly keep 0 values
                     }
                     
-                    const fbaMinDecimal = fbaMin / 100; // Convert percentage to decimal
-                    const fbaMaxDecimal = fbaMax / 100; // Convert percentage to decimal
-                    
-                    // Handle values > 1.0 (>100% FBA) - include them when max is 100%
-                    if (fbaPercent > 1.0 && fbaMax === 100) {
-                        return true;
+                    // Normalize FBA value to percentage format (0-100)
+                    let normalizedFBA;
+                    if (fbaPercent > 100) {
+                        // Data quality issue - value is way too high
+                        console.warn(`FBA value > 100% detected: ${fbaPercent}. Treating as data quality issue.`);
+                        normalizedFBA = fbaPercent; // Keep as-is for now, but flag it
+                    } else if (fbaPercent > 1 && fbaPercent <= 100) {
+                        // Value is already in percentage format (1-100)
+                        normalizedFBA = fbaPercent;
+                    } else {
+                        // Value is in decimal format (0-1), convert to percentage
+                        normalizedFBA = fbaPercent * 100;
                     }
                     
-                    if (fbaPercent < fbaMinDecimal || fbaPercent > fbaMaxDecimal) {
+                    // Filter using normalized percentage values
+                    if (normalizedFBA < fbaMin || normalizedFBA > fbaMax) {
                         return false;
                     }
                     
@@ -746,7 +818,6 @@ MERCHANT002, MERCHANT003
                                     <th>Primary PF</th>
                                     <th>Primary GL</th>
                                     <th>MFN GMS</th>
-                                    <th>Total GMS</th>
                                     <th>FBA %</th>
                                 </tr>
                             </thead>
@@ -760,8 +831,7 @@ MERCHANT002, MERCHANT003
                         <td>${row.primary_pf || ''}</td>
                         <td>${row.primary_gl || ''}</td>
                         <td>${parseFloat(row.mfn_gms || 0).toLocaleString()}</td>
-                        <td>${parseFloat(row.merchant_total_gms || 0).toLocaleString()}</td>
-                        <td>${(parseFloat(row.pct_units_fba || 0) * 100).toFixed(1)}%</td>
+                        <td>${formatFBAPercentage(row.pct_units_fba)}</td>
                     </tr>`;
             });
             
@@ -781,8 +851,8 @@ MERCHANT002, MERCHANT003
             }
             
             // Define the columns we want to include in the CSV
-            const csvHeaders = ['merchant_customer_id', 'merchant_name', 'primary_pf', 'primary_gl', 'mfn_gms', 'merchant_total_gms', 'pct_units_fba'];
-            const csvHeaderLabels = ['Merchant ID', 'Merchant Name', 'Primary PF', 'Primary GL', 'MFN GMS', 'Total GMS', 'FBA %'];
+            const csvHeaders = ['merchant_customer_id', 'merchant_name', 'primary_pf', 'primary_gl', 'mfn_gms', 'pct_units_fba'];
+            const csvHeaderLabels = ['Merchant ID', 'Merchant Name', 'Primary PF', 'Primary GL', 'MFN GMS', 'FBA %'];
             
             // Create CSV content
             let csvContent = csvHeaderLabels.join(',') + '\n';
@@ -791,13 +861,22 @@ MERCHANT002, MERCHANT003
                 const values = csvHeaders.map(header => {
                     let value = row[header] || '';
                     
-                    // Convert FBA percentage from decimal to percentage for display
+                    // Format FBA percentage properly handling data quality issues
                     if (header === 'pct_units_fba' && value !== '') {
-                        value = (parseFloat(value) * 100).toFixed(2);
+                        const fbaValue = parseFloat(value);
+                        if (!isNaN(fbaValue)) {
+                            if (fbaValue > 100) {
+                                value = `${fbaValue.toFixed(2)} (Data Issue)`;
+                            } else if (fbaValue > 1 && fbaValue <= 100) {
+                                value = fbaValue.toFixed(2);
+                            } else {
+                                value = (fbaValue * 100).toFixed(2);
+                            }
+                        }
                     }
                     
                     // Format numbers for better readability
-                    if (['mfn_gms', 'merchant_total_gms'].includes(header) && value !== '') {
+                    if (header === 'mfn_gms' && value !== '') {
                         value = parseFloat(value).toLocaleString();
                     }
                     
