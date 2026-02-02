@@ -376,7 +376,14 @@
                             <input type="number" id="fbaMax" placeholder="Max %" min="0" max="100" value="100" step="0.1">
                         </div>
                     </div>
-                    
+                     <div class="filter-group">
+                        <label>💰 T12M GMS Range (in millions, e.g., 1.5 for $1.5M):</label>
+                        <div class="range-inputs">
+                            <input type="number" id="t12mGmsMin" placeholder="Min $M" min="0" step="0.1">
+                            <span>to</span>
+                            <input type="number" id="t12mGmsMax" placeholder="Max $M" min="0" step="0.1">
+                        </div>
+                    </div>
                     <div class="filter-group">
                         <label for="topCount">🏆 Top Merchants:</label>
                         <select id="topCount">
@@ -393,7 +400,8 @@
                     <div class="filter-group">
                         <label for="sortBy">📈 Sort By:</label>
                         <select id="sortBy">
-                            <option value="mfn_gms" selected>MFN GMS</option>
+                           <option value="merchant_total_t12m_gms" selected>T12M GMS</option>
+                            <option value="mfn_gms">MFN GMS</option>
                             <option value="pct_units_fba">FBA %</option>
                         </select>
                     </div>
@@ -1129,4 +1137,5 @@ MERCHANT002, MERCHANT003
         });
     </script>
 </body>
+
 </html>
